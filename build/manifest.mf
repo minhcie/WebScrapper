@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Main-Class: src.main.java.Scrapper
+Class-Path: .
+            lib/log4j-1.2.9.jar
+            lib/selenium-java-2.53.1.jar
+            lib/selenium-server-standalone-2.53.1.jar
