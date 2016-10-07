@@ -28,11 +28,37 @@ import org.openqa.selenium.WebElement;
 
 public class Scrapper {
 
-    private static final Logger LOG = Logger.getLogger(Scrapper.class);
+    private static final Logger log = Logger.getLogger(Scrapper.class);
 	private static WebDriver driver = null;
 
+    static void usage() {
+        System.err.println("");
+        System.err.println("usage: java -jar Scrapper.jar <auto or report_date (mm/dd/yyyy)>");
+        System.err.println("");
+        System.exit(-1);
+    }
+
 	public static void main(String[] args) {
+        if (args.length == 0 || args.length < 1) {
+            usage();
+        }
+
 		try {
+			String rptDate = null;
+			if (args[0].equalsIgnoreCase("auto")) {
+				// Default report date to yesterday.
+				Calendar cal = Calendar.getInstance();
+				cal.add(Calendar.DATE, -1);
+				cal.set(Calendar.HOUR, 0);
+				cal.set(Calendar.MINUTE, 0);
+				cal.set(Calendar.SECOND, 0);
+				SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+				rptDate = sdf.format(cal.getTime());
+			}
+			else {
+				rptDate = args[0];
+			}
+
 			// Initialize WebDriver for Chrome.
 			String workingDir = System.getProperty("user.dir");
 			System.setProperty("webdriver.chrome.driver", workingDir + "/chromedriver.exe");
@@ -52,7 +78,7 @@ public class Scrapper {
 			// Execute Community OS export wizard.
 			openCommOSWebsite();
 			login("mtran@211sandiego.org", "M1nh@2112");
-			exportWizard();
+			exportWizard(rptDate);
 			closeCommOSWebsite();
 		}
 		catch (IOException ioe) {
@@ -95,7 +121,7 @@ public class Scrapper {
 	 * 
 	 * @throws Exception
 	 */
-	private static void exportWizard() throws Exception {
+	private static void exportWizard(String rptDate) throws Exception {
 		driver.navigate().to("https://211sandiego.communityos.org/zf/exportwizard");
 		fluentWait(By.id("jobname"));
 
@@ -124,20 +150,13 @@ public class Scrapper {
 		fluentWait(By.id("criteria.field.1.1"));
 
 		// Step 4 - report criteria.
-		Calendar cal = Calendar.getInstance();
-		cal.add(Calendar.DATE, -1); // Yesterday.
-		cal.set(Calendar.HOUR, 0);
-		cal.set(Calendar.MINUTE, 0);
-		cal.set(Calendar.SECOND, 0);
-		SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
-
 		Select field_1_dropdown = new Select(driver.findElement(By.id("criteria.field.1.1")));
 		field_1_dropdown.selectByVisibleText("Contact: Create Date/Time");
 		Select criteria_1_dropdown = new Select(driver.findElement(By.id("criteria.criteria.1.1")));
 		criteria_1_dropdown.selectByVisibleText("equal to");
 		WebElement value_1_editbox = driver.findElement(By.id("criteria.value.1.1"));
 		value_1_editbox.clear();
-		value_1_editbox.sendKeys(sdf.format(cal.getTime()));
+		value_1_editbox.sendKeys(rptDate);
 
 		Select field_2_dropdown = new Select(driver.findElement(By.id("criteria.field.1.2")));
 		field_2_dropdown.selectByVisibleText("Portal Restrictions");
@@ -193,6 +212,25 @@ public class Scrapper {
 			while (!f.exists()) {
 				Thread.sleep(3000);
 			}
+
+			// Save a copy in the archive folder.
+			String workingDir = System.getProperty("user.dir");
+			String archivePath = workingDir + "\\archive\\access_" + rptDate.replaceAll("/", "") + ".zip";
+			File archiveFile = new File(archivePath);
+
+			FileInputStream inStream = new FileInputStream(f);
+    	    FileOutputStream outStream = new FileOutputStream(archiveFile);
+
+    	    // Copy the file content in bytes.
+    	    byte[] buffer = new byte[1024];
+    	    int length;
+    	    while ((length = inStream.read(buffer)) > 0) {
+    	    	outStream.write(buffer, 0, length);
+    	    }
+
+    	    inStream.close();
+    	    outStream.close();
+    	    log.info("File is copied successful");
 		}
 	}
 
@@ -214,7 +252,7 @@ public class Scrapper {
 	}; 
 
 	private static void closeCommOSWebsite() throws Exception {
-		driver.close();
+		driver.quit(); // close() doesn't kill the instance.
 	}
 
 	/**
