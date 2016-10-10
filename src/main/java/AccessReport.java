@@ -110,4 +110,34 @@ public class AccessReport extends CommOSExportAbstract {
 		String rptName = "access_" + rptDate.replaceAll("/", "") + ".zip";
 		super.downloadWait(rptName);
 	}
+
+	/**
+	 * Convert CSV file to Excel file.
+	 * 
+	 * @throws Exception
+	 */
+	public void convertCsv2Excel() throws Exception {
+		String excelName = "access.xlsx";
+		super.csv2Excel(excelName);
+	}
+
+	/**
+	 * Copy report (Excel) data to remote server.
+	 * 
+	 * @throws Exception
+	 */
+	public void copyData() throws Exception {
+		String excelName = "access.xlsx";
+		super.copy2Server(excelName);
+	}
+
+	/**
+	 * Import report data into SQL server.
+	 * 
+	 * @throws Exception
+	 */
+	public void importData() throws Exception {
+		String scriptName = "import_access.sql";
+		super.import2SqlServer(scriptName);
+	}
 }

@@ -1,9 +1,11 @@
 package src.main.java;
 
 import java.io.*;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import com.google.common.base.Function;
 
@@ -84,7 +86,7 @@ public abstract class CommOSExportAbstract {
 	}
 
 	/**
-	 * CommunityOS export wizard steps.
+	 * Navigate CommunityOS export wizard.
 	 * 
 	 * @throws Exception
 	 */
@@ -108,9 +110,54 @@ public abstract class CommOSExportAbstract {
 
 		// Step 5 - report options.
 		step5();
+	}
 
-		// Download and save report zip file.
-		downloadReport(rptDate);
+	/**
+	 * Extract report (CSV) data from ZIP file.
+	 * 
+	 * @throws Exception
+	 */
+	public void extractData() throws Exception {
+		// Navigate to export wizard.
+		log.info("Extracting report (CSV) data");
+		String zipFile = "C:\\Downloads\\fb_export.csv.zip";
+		String outputFolder = "C:\\Downloads";
+		byte[] buffer = new byte[1024];
+
+		// Get the zip file content.
+    	ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+
+    	// Get the zip file list entry.
+    	ZipEntry ze = zis.getNextEntry();
+    	while (ze != null) {
+			// Create output file.
+			String fileName = ze.getName();
+			File newFile = new File(outputFolder + File.separator + fileName);
+			FileOutputStream fos = new FileOutputStream(newFile);
+
+			// Write to output file.
+            int len;
+            while ((len = zis.read(buffer)) > 0) {
+       			fos.write(buffer, 0, len);
+            }
+
+			// Close output file.
+            fos.close();
+            ze = zis.getNextEntry();
+    	}
+
+		// Close zip file.
+		zis.closeEntry();
+    	zis.close();
+
+		// Delete zip file.
+		File file = new File(zipFile);
+		if (file.delete()) {
+			log.info("Deleting report zip file");
+		}
+		else {
+			log.error("Failed to delete report zip file");
+		}
 	}
 
 	/**
@@ -123,7 +170,34 @@ public abstract class CommOSExportAbstract {
 	public abstract void step3() throws Exception;
 	public abstract void step4(String rptDate) throws Exception;
 	public abstract void step5() throws Exception;
+
+	/**
+	 * Download and save/archive report data.
+	 * 
+	 * @throws Exception
+	 */
 	public abstract void downloadReport(String rptDate) throws Exception;
+
+	/**
+	 * Convert CSV file to Excel file.
+	 * 
+	 * @throws Exception
+	 */
+	public abstract void convertCsv2Excel() throws Exception;
+
+	/**
+	 * Copy report (Excel) data to remote server.
+	 * 
+	 * @throws Exception
+	 */
+	public abstract void copyData() throws Exception;
+
+	/**
+	 * Import report data into SQL server.
+	 * 
+	 * @throws Exception
+	 */
+	public abstract void importData() throws Exception;
 
 	/**
 	 * Wait 15 seconds for an element to be present on the page, check for its
@@ -222,5 +296,83 @@ public abstract class CommOSExportAbstract {
     	    outStream.close();
     	    log.info("Saving/archiving report zip file: " + rptName);
 		}
+	}
+
+	protected void csv2Excel(String xcelName) throws Exception {
+		// Convert CSV file to Xcel file using VBScript code.
+		log.info("Converting CSV file to Excel file: " + xcelName);
+		String csvFile = "C:\\Downloads\\fb_export.csv";
+		String xcelFile = "C:\\Downloads\\" + xcelName;
+		String workingDir = System.getProperty("user.dir");
+		String csv2xcel = workingDir + "\\csv2xcel.vbs";
+		String cmd = "cscript " + csv2xcel + " " + csvFile + " " + xcelFile;
+		String output = executeShellCommand(cmd);
+		//log.info(output);
+
+		// Delete CSV file.
+		File file = new File(csvFile);
+		if (file.delete()) {
+			log.info("Deleting CSV file");
+		}
+		else {
+			log.error("Failed to delete CSV file");
+		}
+	}
+
+	protected void copy2Server(String xcelName) throws Exception {
+		// Copy report data to remote (SQL) server before import them.
+		log.info("Copying Excel file to remote SQL server");
+		String from = "C:\\Downloads\\" + xcelName;
+		String to = "T:\\" + xcelName; // T must be mapped to \\211-SCSMDW2012\\Temp
+
+		InputStream inStream = new FileInputStream(from);
+		OutputStream outStream = new FileOutputStream(to);
+
+		// Copy the file content in bytes.
+		byte[] buffer = new byte[1024];
+		int length;
+		while ((length = inStream.read(buffer)) > 0) {
+			outStream.write(buffer, 0, length);
+		}
+
+		// Close input/output streams.
+		inStream.close();
+		outStream.close();
+
+		// Delete Excel file.
+		File file = new File(from);
+		if (file.delete()) {
+			log.info("Deleting Excel file");
+		}
+		else {
+			log.error("Failed to delete Excel file");
+		}
+	}
+
+	protected void import2SqlServer(String scriptName) throws Exception {
+		// Import report data into SQL server using SQL command.
+		log.info("Importing report data into SQL server");
+		String sqlcmd = "C:\\Program Files\\Microsoft SQL Server\\110\\Tools\\Binn\\sqlcmd.exe";
+		String serverName = "211-SCSMDW2012\\ANALYST";
+		String workingDir = System.getProperty("user.dir");
+		String sqlScript = workingDir + "\\" + scriptName;
+		String cmd = sqlcmd + " -S " + serverName + " -i " + sqlScript;
+		String output = executeShellCommand(cmd);
+		log.info(output);
+		log.info("***** Done importing report data *****");
+	}
+
+    private String executeShellCommand(String command) throws Exception {
+		StringBuffer output = new StringBuffer();
+		Process p = Runtime.getRuntime().exec(command);
+		p.waitFor();
+		BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+		String line = "";
+		while ((line = reader.readLine())!= null) {
+			output.append(line + "\n");
+		}
+
+		return output.toString();
 	}
 }

@@ -37,9 +37,14 @@ public class Scrapper {
 			}
 
 			AccessReport rpt = new AccessReport();
-			rpt.openCommOSWebsite();
-			rpt.login();
-			rpt.exportWizard(rptDate);
+			//rpt.openCommOSWebsite();
+			//rpt.login();
+			//rpt.exportWizard(rptDate);
+			//rpt.downloadReport(rptDate);
+			//rpt.extractData();
+			//rpt.convertCsv2Excel();
+			//rpt.copyData();
+			rpt.importData();
 			rpt.closeCommOSWebsite();
 		}
 		catch (Exception e) {
