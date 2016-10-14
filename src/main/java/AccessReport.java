@@ -104,11 +104,12 @@ public class AccessReport extends CommOSExportAbstract {
 	/**
 	 * Download and save report zip file.
 	 * 
+	 * @Retun true if report downloaded, otherwise false.
 	 * @throws Exception
 	 */
-	public void downloadReport(String rptDate) throws Exception {
+	public boolean downloadReport(String rptDate) throws Exception {
 		String rptName = "access_" + rptDate.replaceAll("/", "") + ".zip";
-		super.downloadWait(rptName);
+		return super.downloadWait(rptName);
 	}
 
 	/**

@@ -176,7 +176,7 @@ public abstract class CommOSExportAbstract {
 	 * 
 	 * @throws Exception
 	 */
-	public abstract void downloadReport(String rptDate) throws Exception;
+	public abstract boolean downloadReport(String rptDate) throws Exception;
 
 	/**
 	 * Convert CSV file to Excel file.
@@ -239,15 +239,17 @@ public abstract class CommOSExportAbstract {
 		FileUtils.copyFile(scrFile, new File(fileName));
 	}
 
-	protected void downloadWait(String rptName) throws Exception {
+	protected boolean downloadWait(String rptName) throws Exception {
 		// Wait for report data to generate.
 		log.info("Waiting for report zip file");
 		String url = this.driver.getCurrentUrl();
 
 		boolean rptFound = false;
+		boolean noRecordsFound = false;
 		WebElement downloadLink = null;
 		this.driver.get(url);
-		while (!rptFound) {
+		while (!rptFound && !noRecordsFound) {
+			// Check to see if report is generated.
 			List<WebElement> elements = this.driver.findElements(By.tagName("a"));
 			if (elements != null) {
 				for (WebElement ele : elements) {
@@ -260,7 +262,22 @@ public abstract class CommOSExportAbstract {
 				}
 			}
 
+			// If report not found, check to see if no records matched.
 			if (!rptFound) {
+				elements = this.driver.findElements(By.tagName("h4"));				
+				if (elements != null) {
+					for (WebElement ele : elements) {
+						String str = ele.getText();
+						if (str.equalsIgnoreCase("Export Complete")) {
+							log.info("No records matched export criterias");
+							noRecordsFound = true;
+							break;
+						}
+					}
+				}
+			}
+
+			if (!rptFound && !noRecordsFound) {
 				Thread.sleep(15000); // 15 seconds.
 				this.driver.navigate().refresh();
 			}
@@ -296,6 +313,8 @@ public abstract class CommOSExportAbstract {
     	    outStream.close();
     	    log.info("Saving/archiving report zip file: " + rptName);
 		}
+
+		return rptFound;
 	}
 
 	protected void csv2Excel(String xcelName) throws Exception {
@@ -309,13 +328,19 @@ public abstract class CommOSExportAbstract {
 		String output = executeShellCommand(cmd);
 		//log.info(output);
 
-		// Delete CSV file.
-		File file = new File(csvFile);
-		if (file.delete()) {
-			log.info("Deleting CSV file");
+		File f = new File(xcelFile);
+		if (f.exists()) {
+			// Delete CSV file.
+			f = new File(csvFile);
+			if (f.delete()) {
+				log.info("Deleting CSV file");
+			}
+			else {
+				log.error("Failed to delete CSV file");
+			}
 		}
 		else {
-			log.error("Failed to delete CSV file");
+			log.error("Failed to convert CSV file to Excel file");
 		}
 	}
 
@@ -323,29 +348,36 @@ public abstract class CommOSExportAbstract {
 		// Copy report data to remote (SQL) server before import them.
 		log.info("Copying Excel file to remote SQL server");
 		String from = "C:\\Downloads\\" + xcelName;
-		String to = "T:\\" + xcelName; // T must be mapped to \\211-SCSMDW2012\\Temp
+		String to = "T:\\" + xcelName; // T: must be mapped to \\211-SCSMDW2012\Temp
 
-		InputStream inStream = new FileInputStream(from);
-		OutputStream outStream = new FileOutputStream(to);
+		try {
+			InputStream inStream = new FileInputStream(from);
+			OutputStream outStream = new FileOutputStream(to);
 
-		// Copy the file content in bytes.
-		byte[] buffer = new byte[1024];
-		int length;
-		while ((length = inStream.read(buffer)) > 0) {
-			outStream.write(buffer, 0, length);
+			// Copy the file content in bytes.
+			byte[] buffer = new byte[1024];
+			int length;
+			while ((length = inStream.read(buffer)) > 0) {
+				outStream.write(buffer, 0, length);
+			}
+
+			// Close input/output streams.
+			inStream.close();
+			outStream.close();
+
+			// Delete Excel file.
+			File file = new File(from);
+			if (file.delete()) {
+				log.info("Deleting Excel file");
+			}
+			else {
+				log.error("Failed to delete Excel file");
+			}
 		}
-
-		// Close input/output streams.
-		inStream.close();
-		outStream.close();
-
-		// Delete Excel file.
-		File file = new File(from);
-		if (file.delete()) {
-			log.info("Deleting Excel file");
-		}
-		else {
-			log.error("Failed to delete Excel file");
+		catch (IOException ioe) {
+			log.error("IOException while copying file to remote server");
+			log.error(ioe.getMessage());
+			ioe.printStackTrace();
 		}
 	}
 
